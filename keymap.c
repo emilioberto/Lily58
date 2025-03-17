@@ -20,7 +20,8 @@
 
 enum sofle_layers {
     /* _M_XYZ = Mac Os, _W_XYZ = Win/Linux */
-    _COLEMAK,
+    // _COLEMAK,
+    _CANARY,
     _LOWER,
     _RAISE,
     _ADJUST,
@@ -28,7 +29,8 @@ enum sofle_layers {
 
 // clang-format off
 enum custom_keycodes {
-    KC_COLEMAK = SAFE_RANGE,
+    // KC_COLEMAK = SAFE_RANGE,
+    KC_CANARY = SAFE_RANGE,
     KC_LOWER,
     KC_RAISE,
     KC_ADJUST,
@@ -67,6 +69,29 @@ enum custom_keycodes {
     KC_TAB,   KC_Q,   KC_W,    KC_F,    KC_P,    KC_B,                     KC_J,    KC_L,    KC_U,    KC_Y,    KC_SCLN, KC_MINS,
     KC_LSFT,  KC_A,   KC_R,    KC_S,    KC_T,    KC_G,                     KC_M,    KC_N,    KC_E,    KC_I,    KC_O,    KC_QUOT,
     KC_LCTL,  KC_Z,   KC_X,    KC_C,    KC_D,    KC_V,  KC_LBRC,  KC_RBRC, KC_K,    KC_H,    KC_COMM, KC_DOT,  KC_SLSH,  KC_EQL,
+                        KC_LGUI, KC_ALGR, MO(_LOWER), KC_SPC,   KC_ENT, LT(2,KC_BSPC),    KC_DEL,  KC_RGUI
+    ),
+    
+    /* CANARY
+    * ,-----------------------------------------.                    ,-----------------------------------------.
+    * | ESC  |   1  |   2  |   3  |   4  |   5  |                    |   6  |   7  |   8  |   9  |   0  |  `   |
+    * |------+------+------+------+------+------|                    |------+------+------+------+------+------|
+    * | Tab  |   W  |   L  |   Y  |   P  |   B  |                    |   Z  |   F  |   O  |   U  |   '  |  -   |
+    * |------+------+------+------+------+------|                    |------+------+------+------+------+------|
+    * |LShift|   C  |   R  |   S  |   T  |   G  |-------.    ,-------|   M  |   N  |   E  |   I  |   A  |  ;   |
+    * |------+------+------+------+------+------|   [   |    |    ]  |------+------+------+------+------+------|
+    * |LCTRL |   Q  |   J  |   V  |   D  |   K  |-------|    |-------|   X  |   H  |   /  |   ,  |   .  |  =   |
+    * `-----------------------------------------/       /     \      \-----------------------------------------'
+    *                   |  GUI | ALTGR|MO(1) | /Space  /       \Enter \  |LT(2) |  DEL | RGUI|
+    *                   |      |      |      |/       /         \      \ |BackSP|      |      |
+    *                   `----------------------------'           '------''--------------------'
+    */
+
+    [_CANARY] = LAYOUT(
+    KC_ESC,   KC_1,   KC_2,    KC_3,    KC_4,    KC_5,                     KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_GRV,
+    KC_TAB,   KC_W,   KC_L,    KC_Y,    KC_P,    KC_B,                     KC_Z,    KC_F,    KC_O,    KC_U,    KC_QUOT, KC_MINS,
+    KC_LSFT,  KC_C,   KC_R,    KC_S,    KC_T,    KC_G,                     KC_M,    KC_N,    KC_E,    KC_I,    KC_A,    KC_SCLN,
+    KC_LCTL,  KC_Q,   KC_J,    KC_V,    KC_D,    KC_K,  KC_LBRC,  KC_RBRC, KC_X,    KC_H,    KC_SLSH, KC_COMM, KC_DOT,  KC_EQL,
                         KC_LGUI, KC_ALGR, MO(_LOWER), KC_SPC,   KC_ENT, LT(2,KC_BSPC),    KC_DEL,  KC_RGUI
     ),
 
@@ -380,6 +405,9 @@ static void print_status_narrow(void) {
         case _COLEMAK:
             oled_write("CLMAK", false);
             break;
+        case _CANARY:
+            oled_write("CANARY", false);
+            break;
         default:
             oled_write("UNDEF", false);
     }
@@ -392,7 +420,7 @@ static void print_status_narrow(void) {
     oled_set_cursor(0, 6);
 
     switch (get_highest_layer(layer_state)) {
-        case _COLEMAK:
+        case _CANARY:
             oled_write("Base ", false);
             break;
         case _RAISE:
@@ -440,12 +468,51 @@ bool oled_task_user(void) {
 #endif
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (!process_achordion(keycode, record)) { return false; }
+    if (!process_achordion(keycode, record)) { 
+        return false; 
+    }
+
+    static bool ctrl_pressed = false;
+
+    // Rileva se Ctrl è premuto
+    if (keycode == KC_LCTL) {
+        ctrl_pressed = record->event.pressed;
+        return true;  // Lascia che QMK gestisca Ctrl normalmente
+    }
+
+    // Se Ctrl è premuto e un tasto viene premuto
+    if (ctrl_pressed && record->event.pressed) {
+        switch (keycode) {
+            case KC_Q:
+                // Ctrl+Q diventa Ctrl+Z
+                register_code(KC_LCTL);
+                tap_code(KC_Z);
+                unregister_code(KC_LCTL);
+                return false;  // Blocca l'invio di Ctrl+Q originale
+            case KC_J:
+                // Ctrl+J diventa Ctrl+X
+                register_code(KC_LCTL);
+                tap_code(KC_X);
+                unregister_code(KC_LCTL);
+                return false;  // Blocca l'invio di Ctrl+J originale
+            case KC_V:
+                // Ctrl+V diventa Ctrl+C
+                register_code(KC_LCTL);
+                tap_code(KC_C);
+                unregister_code(KC_LCTL);
+                return false;  // Blocca l'invio di Ctrl+V originale
+        }
+    }
 
     switch (keycode) {
         case KC_COLEMAK:
             if (record->event.pressed) {
                 set_single_persistent_default_layer(_COLEMAK);
+            }
+            return false;
+        case KC_CANARY:
+            if (record->event.pressed) {
+                set_single_persistent_default_layer(_CANARY);
             }
             return false;
         case KC_LOWER:
@@ -624,7 +691,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 if (shift_held) {
                     if (record->event.pressed) {
-                        set_single_persistent_default_layer(_COLEMAK);
+                        set_single_persistent_default_layer(_CANARY);
                     }
                 } else {
                     layer_on(_LOWER);
